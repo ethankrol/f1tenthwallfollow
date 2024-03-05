@@ -1,5 +1,98 @@
 import rclpy
 from rclpy.node import Node
+import time
+import numpy as np
+from ackermann_msgs.msg import AckermannDriveStamped
+from sensor_msgs.msg import LaserScan
+import math
+
+
+class Controller(Node):
+   def __init__(self):
+       super().__init__('controller')
+       self.publisher_ = self.create_publisher(AckermannDriveStamped, '/drive', 1000)
+       self.subscriber_ = self.create_subscription(LaserScan, '/scan', self.laser_callback, 1000)
+       self.kp = 14
+       self.kd = 0
+       self.ki = 0.09
+       self.target = 0.3
+       self.lookahead = 
+       self.current_time = time.time()
+       self.dt = 0
+
+       self.integral = 0
+       self.prev_error = 0
+       self.error = 0
+       self.derivate = 0
+  
+   def laser_callback(self, msg):
+       # Print LiDAR output
+       #print(msg.ranges)
+
+
+       # Example of how to send drive command
+       mymsg = AckermannDriveStamped()
+       # Steering angle should be between -40 and 40 most of the time
+       # mymsg.drive.steering_angle=10.0
+       # Speed should be between 0 and 1 most of the time
+       # Send the drive command
+       self.publisher_.publish(mymsg)
+       self.get_logger().info('Publishing: "%s"' % mymsg.drive)
+
+
+       b = msg.ranges[160]
+       a = msg.ranges[280]
+
+
+       alpha = math.atan((a*math.cos(math.pi/6) - b)/(a*math.sin(math.pi/6)))
+       D = b*math.cos(alpha)
+       self.prev_error = self.target - D
+       self.error = D + self.lookahead * math.sin(alpha)
+       self.dt = time.time() - self.current_time
+       self.current_time = time.time()
+       self.integral += self.error * dt
+       self.derivative = (self.error - self.prev_error)/self.dt
+       steeringAngle = self.kp * self.error + self.ki * self.integral + self.kd * self.derivative
+      
+       mymsg.drive.steering_angle = steeringAngle
+
+
+       steeringAngleDeg = np.rad2deg(steeringAngle)
+
+
+       if(steeringAngleDeg < 0):
+           mymsg.drive.speed = 1.5
+          
+       if(steeringAngleDeg >= 0 and steeringAngleDeg <= 10):
+           mymsg.drive.speed = 1.5
+      
+       elif(steeringAngleDeg > 10 and steeringAngleDeg <= 20):
+           mymsg.drive.speed = 1
+
+
+       else:
+           mymsg.drive.speed = 0.5
+
+
+
+
+
+
+def main(args=None):
+   rclpy.init(args=args)
+   print("WallFollow Initialized")
+   controller = Controller()
+   rclpy.spin(controller)
+   controller.destroy_node()
+   rclpy.shutdown()
+
+
+
+
+if __name__ == '__main__':
+   main()
+"""import rclpy
+from rclpy.node import Node
 
 import numpy as np
 from sensor_msgs.msg import LaserScan
@@ -105,4 +198,4 @@ def main(args=None):
 
 
 if __name__ == '__main__':
-    main()
+    main()"""
